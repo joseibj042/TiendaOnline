@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, ArrowLeft, SlidersHorizontal, CheckCircle2, Heart, User, UserCheck, X } from 'lucide-react';
 import { formatearCLP } from '../utils';
+import { supabase } from '../services/supabaseClient';
 
 export default function Catalog({ productos, categoriaFiltro, setVistaActual, setProductoSeleccionado, usuarioActivo, setUsuarioActivo }) {
   const [busqueda, setBusqueda] = useState('');
@@ -8,16 +9,24 @@ export default function Catalog({ productos, categoriaFiltro, setVistaActual, se
   const [filtroTipo, setFiltroTipo] = useState('Todos');
   const [modalAviso, setModalAviso] = useState(null);
   const [mostrarModalAuth, setMostrarModalAuth] = useState(false);
+  
+  // Estados para la paginación
+  const [paginaActual, setPaginaActual] = useState(1);
+  const productosPorPagina = 12;
 
-  // Verificación robusta de sesión activa
   const sesionActual = usuarioActivo || JSON.parse(localStorage.getItem('redragon_sesion_activa'));
+
+  // Resetear a la página 1 cada vez que cambie un filtro o la búsqueda
+  useEffect(() => {
+    setPaginaActual(1);
+  }, [busqueda, filtroTipo, categoriaFiltro]);
 
   const verDetalle = (producto) => {
     setProductoSeleccionado(producto);
     setVistaActual('detalle');
   };
 
-  const toggleWishlist = (e, prod) => {
+  const toggleWishlist = async (e, prod) => {
     e.stopPropagation();
     
     if (!sesionActual) {
@@ -26,10 +35,10 @@ export default function Catalog({ productos, categoriaFiltro, setVistaActual, se
     }
 
     const wishlistActual = sesionActual.wishlist || [];
-    const yaExiste = wishlistActual.some(item => item.id === prod.id);
+    const yaExiste = wishlistActual.some(item => (item.id || item.nombre) === (prod.id || prod.nombre));
     
     const nuevaWishlist = yaExiste 
-      ? wishlistActual.filter(item => item.id !== prod.id)
+      ? wishlistActual.filter(item => (item.id || item.nombre) !== (prod.id || prod.nombre))
       : [...wishlistActual, prod];
       
     const usuarioActualizado = { ...sesionActual, wishlist: nuevaWishlist };
@@ -46,7 +55,13 @@ export default function Catalog({ productos, categoriaFiltro, setVistaActual, se
       localStorage.setItem('redragon_usuarios', JSON.stringify(todos));
     }
 
-    // Disparar evento para actualizar el Navbar al instante
+    if (sesionActual?.email) {
+      await supabase
+        .from('profiles')
+        .update({ wishlist: nuevaWishlist })
+        .eq('email', sesionActual.email);
+    }
+
     window.dispatchEvent(new Event('sesionActualizada'));
 
     const mensaje = yaExiste ? "Producto eliminado de tu lista de deseos." : "¡Producto añadido instantáneamente a tu lista de deseos! ❤️";
@@ -79,6 +94,12 @@ export default function Catalog({ productos, categoriaFiltro, setVistaActual, se
   else if (orden === 'precio_desc') productosMostrados.sort((a, b) => b.precio - a.precio);
   else if (orden === 'nombre_asc') productosMostrados.sort((a, b) => a.nombre.localeCompare(b.nombre));
 
+  // Lógica de Paginación
+  const totalPaginas = Math.ceil(productosMostrados.length / productosPorPagina);
+  const indiceUltimoProducto = paginaActual * productosPorPagina;
+  const indicePrimerProducto = indiceUltimoProducto - productosPorPagina;
+  const productosPaginados = productosMostrados.slice(indicePrimerProducto, indiceUltimoProducto);
+
   return (
     <div className="max-w-7xl mx-auto p-4 space-y-6 mt-8 relative">
       {modalAviso && (
@@ -100,7 +121,7 @@ export default function Catalog({ productos, categoriaFiltro, setVistaActual, se
       <div className="bg-zinc-900/80 backdrop-blur border border-zinc-800 p-4 rounded-lg flex flex-col md:flex-row gap-4 items-center shadow-lg">
         <div className="relative flex-1 w-full">
           <Search className="absolute left-3 top-3 text-zinc-500" size={20} />
-          <input type="text" placeholder="Buscar productos..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 text-white rounded-lg pl-10 pr-4 py-2 focus:outline-none transition" style={{ focusBorderColor: 'var(--color-primary)' }} />
+          <input type="text" placeholder="Buscar productos..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 text-white rounded-lg pl-10 pr-4 py-2 focus:outline-none transition" />
         </div>
         <div className="flex items-center gap-2 w-full md:w-auto bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 cursor-pointer">
           <SlidersHorizontal size={20} className="text-zinc-400" />
@@ -109,44 +130,96 @@ export default function Catalog({ productos, categoriaFiltro, setVistaActual, se
             {tiposDisponibles.map((tipo, index) => <option key={index} value={tipo} className="bg-zinc-900">{tipo}</option>)}
           </select>
         </div>
-        <select className="w-full md:w-auto bg-zinc-800 border border-zinc-700 text-white rounded-lg px-4 py-2 focus:outline-none cursor-pointer" style={{ focusBorderColor: 'var(--color-primary)' }} value={orden} onChange={(e) => setOrden(e.target.value)}>
+        <select className="w-full md:w-auto bg-zinc-800 border border-zinc-700 text-white rounded-lg px-4 py-2 focus:outline-none cursor-pointer" value={orden} onChange={(e) => setOrden(e.target.value)}>
           <option value="defecto">Ordenar por...</option><option value="precio_asc">Menor a mayor precio</option><option value="precio_desc">Mayor a menor precio</option><option value="nombre_asc">Nombre (A - Z)</option>
         </select>
       </div>
 
-      {productosMostrados.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 pt-4">
-          {productosMostrados.map((prod, index) => {
-            const esFavorito = sesionActual?.wishlist?.some(item => item.id === prod.id);
-            return (
-              <div 
-                key={prod.id} 
-                className="bg-zinc-900/80 backdrop-blur-sm rounded-lg overflow-hidden border border-zinc-800 transition cursor-pointer shadow-xl group flex flex-col animate-card-appear opacity-0 relative" 
-                style={{ animationDelay: `${index * 0.05}s` }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--color-primary)'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = ''}
-              >
-                <button 
-                  onClick={(e) => toggleWishlist(e, prod)}
-                  className="absolute top-3 right-3 z-10 bg-black/60 hover:bg-black p-2 rounded-full text-white transition border border-zinc-700 cursor-pointer shadow"
-                >
-                  {esFavorito ? '❤️' : '🤍'}
-                </button>
+      {productosPaginados.length > 0 ? (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 pt-4">
+            {productosPaginados.map((prod, index) => {
+              const esFavorito = sesionActual?.wishlist?.some(item => (item.id || item.nombre) === (prod.id || prod.nombre));
+              const stockActual = prod.stock !== undefined ? prod.stock : 10;
+              const estaAgotado = stockActual <= 0;
 
-                <div className="overflow-hidden bg-zinc-800 h-48 flex items-center justify-center p-4" onClick={() => verDetalle(prod)}>
-                   <img src={prod.imagen} alt={prod.nombre} className="w-full h-full object-contain group-hover:scale-110 transition duration-500" />
-                </div>
-                <div className="p-4 flex-1 flex flex-col justify-between" onClick={() => verDetalle(prod)}>
-                  <div>
-                    <h4 className="font-bold text-lg mb-1 text-zinc-100">{prod.nombre}</h4>
-                    <span className="text-xs bg-zinc-700 text-zinc-300 px-2 py-1 rounded">{prod.tipo}</span>
+              return (
+                <div 
+                  key={prod.id || index} 
+                  className="bg-zinc-900/80 backdrop-blur-sm rounded-lg overflow-hidden border border-zinc-800 transition cursor-pointer shadow-xl group flex flex-col animate-card-appear opacity-0 relative" 
+                  style={{ animationDelay: `${index * 0.05}s` }}
+                  onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--color-primary)'}
+                  onMouseLeave={(e) => e.currentTarget.style.borderColor = ''}
+                >
+                  <button 
+                    onClick={(e) => toggleWishlist(e, prod)}
+                    className="absolute top-3 right-3 z-10 bg-black/60 hover:bg-black p-2 rounded-full text-white transition border border-zinc-700 cursor-pointer shadow"
+                  >
+                    {esFavorito ? '❤️' : '🤍'}
+                  </button>
+
+                  <div className="overflow-hidden bg-zinc-800 h-48 flex items-center justify-center p-4 relative" onClick={() => verDetalle(prod)}>
+                     <img src={prod.imagen} alt={prod.nombre} loading="lazy" className="w-full h-full object-contain group-hover:scale-110 transition duration-500" />
+                     {estaAgotado && (
+                       <div className="absolute inset-0 bg-black/70 backdrop-blur-[2px] flex items-center justify-center">
+                         <span className="bg-red-600 text-white font-bold px-3 py-1 rounded-full text-xs uppercase tracking-wider shadow-lg border border-red-400">
+                           Agotado
+                         </span>
+                       </div>
+                     )}
                   </div>
-                  <p className="font-bold text-xl mt-4" style={{ color: 'var(--color-primary)' }}>{formatearCLP(prod.precio)}</p>
+
+                  <div className="p-4 flex-1 flex flex-col justify-between" onClick={() => verDetalle(prod)}>
+                    <div>
+                      <h4 className="font-bold text-lg mb-1 text-zinc-100">{prod.nombre}</h4>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-xs bg-zinc-700 text-zinc-300 px-2 py-1 rounded">{prod.tipo}</span>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded ${!estaAgotado ? 'bg-green-950/60 text-green-400 border border-green-800/50' : 'bg-red-950/60 text-red-400 border border-red-800/50'}`}>
+                          {!estaAgotado ? `Stock: ${stockActual}` : 'Agotado'}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="font-bold text-xl mt-2" style={{ color: 'var(--color-primary)' }}>{formatearCLP(prod.precio)}</p>
+                  </div>
                 </div>
+              );
+            })}
+          </div>
+
+          {/* CONTROLES DE PAGINACIÓN */}
+          {totalPaginas > 1 && (
+            <div className="flex justify-center items-center gap-2 pt-8 pb-4">
+              <button 
+                onClick={() => setPaginaActual(prev => Math.max(prev - 1, 1))}
+                disabled={paginaActual === 1}
+                className="px-4 py-2 bg-zinc-800 border border-zinc-700 text-white rounded-lg text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-700 transition cursor-pointer"
+              >
+                Anterior
+              </button>
+
+              <div className="flex items-center gap-1.5">
+                {Array.from({ length: totalPaginas }, (_, i) => i + 1).map((numero) => (
+                  <button
+                    key={numero}
+                    onClick={() => setPaginaActual(numero)}
+                    className={`w-10 h-10 rounded-lg font-bold text-sm transition cursor-pointer border ${paginaActual === numero ? 'text-white border-transparent shadow-lg' : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700'}`}
+                    style={paginaActual === numero ? { backgroundColor: 'var(--color-primary)' } : {}}
+                  >
+                    {numero}
+                  </button>
+                ))}
               </div>
-            );
-          })}
-        </div>
+
+              <button 
+                onClick={() => setPaginaActual(prev => Math.min(prev + 1, totalPaginas))}
+                disabled={paginaActual === totalPaginas}
+                className="px-4 py-2 bg-zinc-800 border border-zinc-700 text-white rounded-lg text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-700 transition cursor-pointer"
+              >
+                Siguiente
+              </button>
+            </div>
+          )}
+        </>
       ) : (
         <div className="text-center py-20 text-zinc-400 text-xl">No se encontraron productos con esos filtros.</div>
       )}

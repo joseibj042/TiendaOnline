@@ -1,25 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, CreditCard, MapPin, Tag, CheckCircle, Package, Home, Lock } from 'lucide-react';
-import { formatearCLP, formatearRutInput } from '../utils';
-
-const regionesChile = [
-  { region: "Región de Arica y Parinacota", comunas: ["Arica", "Camarones", "Putre", "General Lagos"], costoEnvio: 8990 },
-  { region: "Región de Tarapacá", comunas: ["Iquique", "Alto Hospicio", "Pozo Almonte", "Camiña", "Colchane", "Huara", "Pica"], costoEnvio: 8990 },
-  { region: "Región de Antofagasta", comunas: ["Antofagasta", "Mejillones", "Sierra Gorda", "Taltal", "Calama", "Ollagüe", "San Pedro de Atacama", "Tocopilla", "María Elena"], costoEnvio: 6990 },
-  { region: "Región de Atacama", comunas: ["Copiapó", "Caldera", "Tierra Amarilla", "Chañaral", "Diego de Almagro", "Vallenar", "Alto del Carmen", "Freirina", "Huasco"], costoEnvio: 6990 },
-  { region: "Región de Coquimbo", comunas: ["La Serena", "Coquimbo", "Andacollo", "La Higuera", "Paihuano", "Vicuña", "Illapel", "Canela", "Los Vilos", "Salamanca", "Ovalle", "Combarbalá", "Monte Patria", "Punitaqui", "Río Hurtado"], costoEnvio: 4990 },
-  { region: "Región de Valparaíso", comunas: ["Valparaíso", "Casablanca", "Concón", "Juan Fernández", "Puchuncaví", "Quintero", "Viña del Mar", "Isla de Pascua", "Los Andes", "Calle Larga", "San Esteban", "Rinconada", "La Ligua", "Cabildo", "Papudo", "Petorca", "Zapallar", "Quillota", "Calera", "Hijuelas", "La Cruz", "Nogales", "San Antonio", "Algarrobo", "Cartagena", "El Quisco", "El Tabo", "Santo Domingo", "San Felipe", "Catemu", "Llaillay", "Panquehue", "Putaendo", "Limache", "Quilpué", "Villa Alemana", "Olmué"], costoEnvio: 4990 },
-  { region: "Región Metropolitana de Santiago", comunas: ["Cerrillos", "Cerro Navia", "Conchalí", "El Bosque", "Estación Central", "Huechuraba", "Independencia", "La Cisterna", "La Florida", "La Granja", "La Pintana", "La Reina", "Las Condes", "Lo Barnechea", "Lo Espejo", "Lo Prado", "Macul", "Maipú", "Ñuñoa", "Pedro Aguirre Cerda", "Peñalolén", "Providencia", "Pudahuel", "Quilicura", "Quinta Normal", "Recoleta", "Renca", "Santiago", "San Joaquín", "San Miguel", "San Ramón", "Vitacura", "Puente Alto", "Pirque", "San José de Maipo", "Colina", "Lampa", "Tiltil", "San Bernardo", "Buin", "Calera de Tango", "Paine", "Melipilla", "Alhué", "Curacaví", "María Pinto", "San Pedro", "Talagante", "El Monte", "Isla de Maipo", "Padre Hurtado", "Peñaflor"], costoEnvio: 3500 },
-  { region: "Región del Libertador General Bernardo O'Higgins", comunas: ["Rancagua", "Codegua", "Coinco", "Coltauco", "Doñihue", "Graneros", "Las Cabras", "Machalí", "Malloa", "Mostazal", "Olivar", "Peumo", "Pichidegua", "Quinta de Tilcoco", "Rengo", "Requínoa", "San Vicente", "Pichilemu", "La Estrella", "Litueche", "Marchihue", "Navidad", "Paredones", "San Fernando", "Chépica", "Chimbarongo", "Nancagua", "Palmilla", "Peralillo", "Placilla", "Pumanque", "Santa Cruz"], costoEnvio: 4990 },
-  { region: "Región del Maule", comunas: ["Talca", "Constitución", "Curepto", "Empedrado", "Maule", "Pelarco", "Pencahue", "Río Claro", "San Clemente", "San Rafael", "Cauquenes", "Chanco", "Pelluhue", "Curicó", "Hualañé", "Licantén", "Molina", "Rauco", "Romeral", "Sagrada Familia", "Teno", "Vichuquén", "Linares", "Colbún", "Longaví", "Parral", "Retiro", "San Javier", "Villa Alegre", "Yerbas Buenas"], costoEnvio: 4990 },
-  { region: "Región de Ñuble", comunas: ["Chillán", "Chillán Viejo", "Bulnes", "Cobquecura", "Coelemu", "Coihueco", "El Carmen", "Ninhue", "Ñiquén", "Pemuco", "Pinto", "Portezuelo", "Quillón", "Quirihue", "Ránquil", "San Carlos", "San Fabián", "San Ignacio", "San Nicolás", "Treguaco", "Yungay"], costoEnvio: 4990 },
-  { region: "Región del Biobío", comunas: ["Concepción", "Coronel", "Chiguayante", "Florida", "Hualpén", "Hualqui", "Lota", "Penco", "San Pedro de la Paz", "Santa Juana", "Talcahuano", "Tomé", "Lebu", "Arauco", "Cañete", "Contulmo", "Curanilahue", "Los Álamos", "Tirúa", "Los Ángeles", "Antuco", "Cabrero", "Laja", "Mulchén", "Nacimiento", "Negrete", "Quilaco", "Quilleco", "San Rosendo", "Santa Bárbara", "Tucapel", "Yumbel"], costoEnvio: 4990 },
-  { region: "Región de La Araucanía", comunas: ["Temuco", "Carahue", "Cunco", "Curarrehue", "Freire", "Galvarino", "Gorbea", "Lautaro", "Loncoche", "Melipeuco", "Nueva Imperial", "Padre Las Casas", "Perquenco", "Pitrufquén", "Pucón", "Saavedra", "Teodoro Schmidt", "Toltén", "Vilcún", "Villarrica", "Cholchol", "Angol", "Collipulli", "Curacautín", "Ercilla", "Lonquimay", "Los Sauces", "Lumaco", "Purén", "Renaico", "Traiguén", "Victoria"], costoEnvio: 6990 },
-  { region: "Región de Los Ríos", comunas: ["Valdivia", "Corral", "Lanco", "Los Lagos", "Máfil", "Mariquina", "Paillaco", "Panguipulli", "La Unión", "Río Bueno", "Futrono", "Lago Ranco"], costoEnvio: 6990 },
-  { region: "Región de Los Lagos", comunas: ["Puerto Montt", "Calbuco", "Cochamó", "Fresia", "Frutillar", "Los Muermos", "Llanquihue", "Maullín", "Puerto Varas", "Castro", "Ancud", "Chonchi", "Curaco de Vélez", "Dalcahue", "Puqueldón", "Queilén", "Quellón", "Quemchi", "Quinchao", "Osorno", "Puerto Octay", "Purranque", "Puyehue", "Río Negro", "San Juan de la Costa", "San Pablo", "Chaitén", "Futaleufú", "Hualaihué", "Palena"], costoEnvio: 6990 },
-  { region: "Región Aysén del General Carlos Ibáñez del Campo", comunas: ["Coihaique", "Lago Verde", "Aysén", "Cisnes", "Guaitecas", "Cochrane", "O'Higgins", "Tortel", "Chile Chico", "Río Ibáñez"], costoEnvio: 8990 },
-  { region: "Región de Magallanes y de la Antártica Chilena", comunas: ["Punta Arenas", "Laguna Blanca", "Río Verde", "San Gregorio", "Cabo de Hornos", "Antártica", "Porvenir", "Primavera", "Timaukel", "Natales", "Torres del Paine"], costoEnvio: 8990 }
-];
+import { supabase } from '../services/supabaseClient';
+import { formatearCLP, formatearRutInput, regionesChile } from '../utils';
 
 const limpiarMonto = (val) => {
   if (typeof val === 'number') return val;
@@ -41,17 +23,18 @@ export default function Checkout({ carrito = [], total, usuarioActivo, setUsuari
   const [errorPago, setErrorPago] = useState('');
   const [compraExitosaDatos, setCompraExitosaDatos] = useState(null);
   
-  const [direccionSeleccionadaIdx, setDireccionSeleccionadaIdx] = useState(usuarioActivo?.direcciones?.length > 0 ? 0 : -1);
+  const [direccionSeleccionadaIdx, setDireccionSeleccionadaIdx] = useState(-1);
 
   const [nombreNuevaDir, setNombreNuevaDir] = useState('');
   const [calleNuevaDir, setCalleNuevaDir] = useState('');
   const [regionIdx, setRegionIdx] = useState(6);
   const [comunaSeleccionada, setComunaSeleccionada] = useState(regionesChile[6].comunas[0]);
   const [rutDir, setRutDir] = useState('');
+  const [telefonoDir, setTelefonoDir] = useState(''); 
   const [observacionNuevaDir, setObservacionNuevaDir] = useState('');
   const [guardarDireccionPerfil, setGuardarDireccionPerfil] = useState(true);
 
-  const [metodoPago, setMetodoPago] = useState(usuarioActivo?.tarjetas?.length > 0 ? 'guardada' : 'nueva');
+  const [metodoPago, setMetodoPago] = useState('nueva');
   const [tarjetaSeleccionadaIdx, setTarjetaSeleccionadaIdx] = useState(0);
   const [cvvConfirmacion, setCvvConfirmacion] = useState('');
   
@@ -66,8 +49,42 @@ export default function Checkout({ carrito = [], total, usuarioActivo, setUsuari
   const [envioGratisPorPromo, setEnvioGratisPorPromo] = useState(false);
   const [codigoActivoUsado, setCodigoActivoUsado] = useState('');
   const [mensajePromo, setMensajePromo] = useState('');
+  const [cuponActivoDB, setCuponActivoDB] = useState(null);
 
-  // Formateo y validación de tarjetas para el Checkout
+  // Sincronización automática con Supabase al cargar el Checkout
+  useEffect(() => {
+    const fetchUserData = async () => {
+      if (!usuarioActivo?.email) return;
+
+      const { data: userData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('email', usuarioActivo.email)
+        .single();
+
+      if (userData) {
+        const usuarioActualizado = {
+          ...usuarioActivo,
+          ...userData,
+          direcciones: userData.direcciones || [],
+          tarjetas: userData.tarjetas || []
+        };
+        setUsuarioActivo(usuarioActualizado);
+
+        // Preseleccionar la primera dirección si existe
+        if (userData.direcciones && userData.direcciones.length > 0) {
+          setDireccionSeleccionadaIdx(0);
+        }
+
+        // Preseleccionar método de pago guardado si existen tarjetas
+        if (userData.tarjetas && userData.tarjetas.length > 0) {
+          setMetodoPago('guardada');
+        }
+      }
+    };
+    fetchUserData();
+  }, [usuarioActivo?.email]);
+
   const manejarCambioNumeroTarjetaCheckout = (e) => {
     let valor = e.target.value.replace(/\D/g, '');
     valor = valor.substring(0, 16);
@@ -103,18 +120,66 @@ export default function Checkout({ carrito = [], total, usuarioActivo, setUsuari
   };
 
   const subtotalCalculado = limpiarMonto(total) || carrito.reduce((acc, item) => acc + (limpiarMonto(item.precio) * (item.cantidad || 1)), 0);
-  const montoDescuento = Math.round(subtotalCalculado * descuentoAplicado);
+  
+  let montoDescuento = 0;
+  if (descuentoAplicado < 1 && descuentoAplicado > 0) { 
+    montoDescuento = Math.round(subtotalCalculado * descuentoAplicado);
+  } else if (descuentoAplicado > 1) { 
+    montoDescuento = descuentoAplicado; 
+  }
+
   const costoEnvioBase = obtenerEnvioReal(regionesChile[regionIdx]?.costoEnvio || 0);
   const envio = (subtotalCalculado >= 60000 || subtotalCalculado >= 60 || envioGratisPorPromo) ? 0 : costoEnvioBase;
   const totalAPagar = subtotalCalculado - montoDescuento + envio;
 
-  const aplicarPromo = () => {
+  const aplicarPromo = async () => {
     if (!usuarioActivo) {
       setMensajePromo('Inicia sesión para usar códigos promocionales.');
       return;
     }
 
     const cod = codigoPromoInput.trim().toUpperCase();
+    setMensajePromo('Verificando cupón...');
+
+    try {
+      const { data: coupon } = await supabase
+        .from('coupons')
+        .select('*')
+        .eq('code', cod)
+        .eq('is_active', true)
+        .single();
+
+      if (coupon) {
+         const { data: alreadyUsed } = await supabase
+          .from('user_coupons_used')
+          .select('*')
+          .eq('user_id', usuarioActivo.id)
+          .eq('coupon_id', coupon.id)
+          .single();
+
+         if (alreadyUsed) {
+           setMensajePromo('Ya has utilizado este cupón antes.');
+           setDescuentoAplicado(0);
+           setEnvioGratisPorPromo(false);
+           setCuponActivoDB(null);
+           return;
+         }
+
+         if (coupon.discount_percentage > 0) {
+             setDescuentoAplicado(coupon.discount_percentage / 100);
+         } else if (coupon.discount_amount > 0) {
+             setDescuentoAplicado(coupon.discount_amount);
+         }
+         
+         setEnvioGratisPorPromo(false); 
+         setCuponActivoDB(coupon);
+         setMensajePromo('¡Cupón aplicado con éxito!');
+         return; 
+      }
+    } catch (err) {
+        console.error("Error al verificar cupón en BD", err);
+    }
+    
     const codigosUsadosUsuario = usuarioActivo.codigosUsados || [];
 
     if (codigosUsadosUsuario.includes(cod)) {
@@ -129,28 +194,32 @@ export default function Checkout({ carrito = [], total, usuarioActivo, setUsuari
       setEnvioGratisPorPromo(false);
       setCodigoActivoUsado('REDRAGON2026');
       setMensajePromo('¡10% OFF Aplicado!'); 
+      setCuponActivoDB(null);
     } else if (cod === 'ZIGZAG') { 
       setDescuentoAplicado(0.25); 
       setEnvioGratisPorPromo(true);
       setCodigoActivoUsado('ZIGZAG');
       setMensajePromo('¡25% OFF + Envío Gratis Aplicado!'); 
+      setCuponActivoDB(null);
     } else { 
       setDescuentoAplicado(0); 
       setEnvioGratisPorPromo(false);
       setCodigoActivoUsado('');
+      setCuponActivoDB(null);
       setMensajePromo('El código ingresado no es válido o caducó.'); 
     }
   };
 
   const handleProcederPago = () => {
     if (direccionSeleccionadaIdx === -1) {
-      if (calleNuevaDir.trim() && rutDir.trim()) {
+      if (calleNuevaDir.trim() && rutDir.trim() && telefonoDir.trim() && telefonoDir.length === 9) {
         const nuevaDirObj = {
           nombre: nombreNuevaDir.trim() || 'Mi Dirección',
           calle: calleNuevaDir.trim(),
           comuna: comunaSeleccionada,
           region: regionesChile[regionIdx].region,
           rut: rutDir.trim(),
+          telefono: '+56' + telefonoDir.trim(),
           observacion: observacionNuevaDir.trim()
         };
         let nuevasDirecciones = [...(usuarioActivo?.direcciones || [])];
@@ -160,13 +229,12 @@ export default function Checkout({ carrito = [], total, usuarioActivo, setUsuari
           const usuarioActualizado = { ...usuarioActivo, direcciones: nuevasDirecciones };
           setUsuarioActivo(usuarioActualizado);
           localStorage.setItem('redragon_sesion_activa', JSON.stringify(usuarioActualizado));
-          const todos = JSON.parse(localStorage.getItem('redragon_usuarios')) || [];
-          const index = todos.findIndex(u => u.email === usuarioActivo.email);
-          if (index !== -1) { todos[index] = usuarioActualizado; localStorage.setItem('redragon_usuarios', JSON.stringify(todos)); }
+          
+          supabase.from('profiles').update({ direcciones: nuevasDirecciones }).eq('email', usuarioActivo.email).then();
         }
         setDireccionSeleccionadaIdx(nuevasDirecciones.length - 1);
       } else {
-        setErrorPago("Por favor, selecciona una dirección o completa los datos para agregar una nueva.");
+        setErrorPago("Por favor, completa todos los campos de la dirección, incluyendo el teléfono válido de 9 dígitos.");
         return;
       }
     }
@@ -174,7 +242,7 @@ export default function Checkout({ carrito = [], total, usuarioActivo, setUsuari
     setPasoActual(2);
   };
 
-  const handlePagarFinal = (e) => {
+  const handlePagarFinal = async (e) => {
     e.preventDefault();
     setErrorPago('');
 
@@ -196,12 +264,72 @@ export default function Checkout({ carrito = [], total, usuarioActivo, setUsuari
 
     setProcesando(true);
 
-    setTimeout(() => {
-      const idOrden = `ORD-${Date.now().toString().slice(-6)}`;
-      const comprasExistentes = JSON.parse(localStorage.getItem('redragon_compras')) || [];
+    try {
+      const idOrdenNum = Math.floor(100000 + Math.random() * 900000);
+      const idOrdenStr = `ORD-${idOrdenNum}`;
+
+      const dirActual = usuarioActivo?.direcciones?.[direccionSeleccionadaIdx] || {
+        calle: calleNuevaDir,
+        comuna: comunaSeleccionada,
+        region: regionesChile[regionIdx].region,
+        rut: rutDir,
+        telefono: '+56' + telefonoDir
+      };
+
+      let infoTarjetaUsada = '';
+      if (metodoPago === 'guardada' && usuarioActivo?.tarjetas?.[tarjetaSeleccionadaIdx]) {
+        const tGuardada = usuarioActivo.tarjetas[tarjetaSeleccionadaIdx];
+        const ultimos4 = String(tGuardada.numero).slice(-4);
+        infoTarjetaUsada = `•••• •••• •••• ${ultimos4} (${tGuardada.titular})`;
+      } else {
+        const ultimos4Nueva = String(nuevaTarjetaNum).slice(-4);
+        infoTarjetaUsada = `•••• •••• •••• ${ultimos4Nueva} (${nuevaTarjetaTit})`;
+      }
+
+      await supabase
+        .from('pedidos')
+        .insert([
+          {
+            id: idOrdenStr,
+            user_id: usuarioActivo?.id || null,
+            email: usuarioActivo?.email || 'invitado@redragon.cl',
+            fecha: new Date().toLocaleDateString(),
+            productos: carrito,
+            subtotal: subtotalCalculado,
+            descuento: montoDescuento,
+            envio: envio,
+            total: totalAPagar,
+            estado: 'Procesando',
+            direccion_envio: `${dirActual.calle}, ${dirActual.comuna}, ${dirActual.region}`
+          }
+        ]);
+
+      await Promise.all(carrito.map(async (item) => {
+        const cantidadComprada = item.cantidad || 1;
+        const { data: productoDB } = await supabase
+          .from('products')
+          .select('stock')
+          .eq('id', item.id)
+          .single();
+
+        if (productoDB) {
+          const nuevoStock = productoDB.stock - cantidadComprada;
+          await supabase
+            .from('products')
+            .update({ stock: nuevoStock >= 0 ? nuevoStock : 0 })
+            .eq('id', item.id);
+        }
+      }));
       
+      if (cuponActivoDB && usuarioActivo) {
+          await supabase
+            .from('user_coupons_used')
+            .insert([{ user_id: usuarioActivo.id, coupon_id: cuponActivoDB.id }]);
+      }
+
+      const comprasExistentes = JSON.parse(localStorage.getItem('redragon_compras')) || [];
       const nuevaCompra = {
-        id: idOrden,
+        id: idOrdenStr,
         email: usuarioActivo?.email || 'invitado@redragon.cl',
         fecha: new Date().toLocaleDateString(),
         productos: [...carrito],
@@ -209,7 +337,10 @@ export default function Checkout({ carrito = [], total, usuarioActivo, setUsuari
         descuento: montoDescuento,
         envio: envio,
         total: totalAPagar,
-        estado: 'Procesando'
+        estado: 'Procesando',
+        rut: dirActual.rut || rutDir,
+        telefono: dirActual.telefono || ('+56' + telefonoDir),
+        tarjetaUsada: infoTarjetaUsada
       };
 
       localStorage.setItem('redragon_compras', JSON.stringify([...comprasExistentes, nuevaCompra]));
@@ -222,32 +353,27 @@ export default function Checkout({ carrito = [], total, usuarioActivo, setUsuari
       if (metodoPago === 'nueva' && guardarNuevaTarjeta && usuarioActivo) {
         const tarjetaObjeto = { numero: nuevaTarjetaNum, titular: nuevaTarjetaTit, expiracion: nuevaTarjetaExp, cvv: nuevaTarjetaCvv };
         const todasTarjetas = usuarioActivo.tarjetas || [];
-        const usuarioActualizado = { ...usuarioActivo, tarjetas: [...todasTarjetas, tarjetaObjeto], codigosUsados: codigosUsadosActualizados };
+        const nuevasTarjetas = [...todasTarjetas, tarjetaObjeto];
+        const usuarioActualizado = { ...usuarioActivo, tarjetas: nuevasTarjetas, codigosUsados: codigosUsadosActualizados };
         setUsuarioActivo(usuarioActualizado);
         localStorage.setItem('redragon_sesion_activa', JSON.stringify(usuarioActualizado));
         
-        const usuariosGuardados = JSON.parse(localStorage.getItem('redragon_usuarios')) || [];
-        const index = usuariosGuardados.findIndex(u => u.email === usuarioActivo.email);
-        if (index !== -1) {
-          usuariosGuardados[index] = usuarioActualizado;
-          localStorage.setItem('redragon_usuarios', JSON.stringify(usuariosGuardados));
-        }
+        supabase.from('profiles').update({ tarjetas: nuevasTarjetas, codigosUsados: codigosUsadosActualizados }).eq('email', usuarioActivo.email).then();
       } else if (usuarioActivo) {
         const usuarioActualizado = { ...usuarioActivo, codigosUsados: codigosUsadosActualizados };
         setUsuarioActivo(usuarioActualizado);
         localStorage.setItem('redragon_sesion_activa', JSON.stringify(usuarioActualizado));
-        const usuariosGuardados = JSON.parse(localStorage.getItem('redragon_usuarios')) || [];
-        const index = usuariosGuardados.findIndex(u => u.email === usuarioActivo.email);
-        if (index !== -1) {
-          usuariosGuardados[index] = usuarioActualizado;
-          localStorage.setItem('redragon_usuarios', JSON.stringify(usuariosGuardados));
-        }
       }
 
       setProcesando(false);
       if (typeof vaciarCarrito === 'function') vaciarCarrito();
       setCompraExitosaDatos(nuevaCompra);
-    }, 3000); 
+
+    } catch (err) {
+      console.error(err);
+      setErrorPago('Ocurrió un error al procesar el pago.');
+      setProcesando(false);
+    }
   };
 
   if (compraExitosaDatos) {
@@ -258,7 +384,7 @@ export default function Checkout({ carrito = [], total, usuarioActivo, setUsuari
         </div>
         <div className="space-y-2">
           <h2 className="text-3xl font-bold">¡Compra Realizada con Éxito!</h2>
-          <p className="text-sm text-zinc-400">Tu orden <strong className="font-mono" style={{ color: 'var(--color-primary)' }}>#{compraExitosaDatos.id}</strong> ha sido procesada correctamente.</p>
+          <p className="text-sm text-zinc-400">Tu orden <strong className="font-mono" style={{ color: 'var(--color-primary)' }}>#{compraExitosaDatos.id}</strong> ha sido guardada en la base de datos.</p>
         </div>
         <div className="bg-zinc-900 p-4 rounded-xl border border-zinc-800 text-left space-y-3 animate-fade-in">
           <div className="flex justify-between text-xs text-zinc-400 border-b border-zinc-800 pb-2">
@@ -319,7 +445,7 @@ export default function Checkout({ carrito = [], total, usuarioActivo, setUsuari
                     {direccionSeleccionadaIdx === idx && <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'var(--color-primary)' }} />}
                   </div>
                   <div>
-                    <h4 className="font-bold text-sm">{dir.nombre || 'Dirección'} <span className="ml-2 text-[10px] bg-zinc-700 px-2 py-0.5 rounded uppercase">RUT: {dir.rut}</span></h4>
+                    <h4 className="font-bold text-sm">{dir.nombre || 'Dirección'} <span className="ml-2 text-[10px] bg-zinc-700 px-2 py-0.5 rounded uppercase">RUT: {dir.rut}</span> <span className="ml-2 text-[10px] bg-zinc-700 px-2 py-0.5 rounded uppercase">Tel: {dir.telefono || 'Sin tel'}</span></h4>
                     <p className="text-zinc-300 text-sm mt-1">{dir.calle}</p>
                     {dir.observacion && <p className="text-xs text-zinc-400 italic mt-0.5">Obs: {dir.observacion}</p>}
                     <p className="text-xs text-zinc-500">{dir.comuna}, {dir.region}</p>
@@ -332,7 +458,6 @@ export default function Checkout({ carrito = [], total, usuarioActivo, setUsuari
           <div className="pt-4 border-t border-zinc-800 space-y-4">
             <p className="text-xs font-bold uppercase" style={{ color: 'var(--color-primary)' }}>O Agregar Nueva Dirección</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              
               <select value={regionIdx} onChange={e => { setRegionIdx(Number(e.target.value)); setComunaSeleccionada(regionesChile[Number(e.target.value)].comunas[0]); setDireccionSeleccionadaIdx(-1); }} className="bg-zinc-800 border border-zinc-700 text-white rounded p-2.5 text-xs outline-none">
                 {regionesChile.map((r, i) => (
                   <option key={i} value={i}>{r.region}</option>
@@ -345,13 +470,30 @@ export default function Checkout({ carrito = [], total, usuarioActivo, setUsuari
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <input type="text" placeholder="Nombre (Ej: Casa)" value={nombreNuevaDir} onChange={e => { setNombreNuevaDir(e.target.value); setDireccionSeleccionadaIdx(-1); }} className="bg-zinc-800 border border-zinc-700 text-white rounded p-2.5 text-xs outline-none" style={{ focusBorderColor: 'var(--color-primary)' }} />
-              <input type="text" placeholder="Calle y número" value={calleNuevaDir} onChange={e => { setCalleNuevaDir(e.target.value); setDireccionSeleccionadaIdx(-1); }} className="bg-zinc-800 border border-zinc-700 text-white rounded p-2.5 text-xs outline-none" style={{ focusBorderColor: 'var(--color-primary)' }} />
-              <input type="text" placeholder="RUT (Ej: 12.345.678-9)" value={rutDir} onChange={e => { setRutDir(formatearRutInput(e.target.value)); setDireccionSeleccionadaIdx(-1); }} maxLength="12" className="bg-zinc-800 border border-zinc-700 text-white rounded p-2.5 text-xs outline-none" style={{ focusBorderColor: 'var(--color-primary)' }} />
+              <input type="text" placeholder="Nombre (Ej: Casa)" value={nombreNuevaDir} onChange={e => { setNombreNuevaDir(e.target.value); setDireccionSeleccionadaIdx(-1); }} className="bg-zinc-800 border border-zinc-700 text-white rounded p-2.5 text-xs outline-none" />
+              <input type="text" placeholder="Calle y número" value={calleNuevaDir} onChange={e => { setCalleNuevaDir(e.target.value); setDireccionSeleccionadaIdx(-1); }} className="bg-zinc-800 border border-zinc-700 text-white rounded p-2.5 text-xs outline-none" />
+              <input type="text" placeholder="RUT (Ej: 12.345.678-9)" value={rutDir} onChange={e => { setRutDir(formatearRutInput(e.target.value)); setDireccionSeleccionadaIdx(-1); }} maxLength="12" className="bg-zinc-800 border border-zinc-700 text-white rounded p-2.5 text-xs outline-none" />
             </div>
 
-            <div>
-              <input type="text" placeholder="Observación / Referencia (Ej: Dejar en portería, timbre 402)" value={observacionNuevaDir} onChange={e => { setObservacionNuevaDir(e.target.value); setDireccionSeleccionadaIdx(-1); }} className="w-full bg-zinc-800 border border-zinc-700 text-white rounded p-2.5 text-xs outline-none" style={{ focusBorderColor: 'var(--color-primary)' }} />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="flex items-center bg-zinc-800 border border-zinc-700 rounded overflow-hidden">
+                <span className="bg-zinc-900 px-3 py-2.5 text-xs text-zinc-400 font-mono border-r border-zinc-700">+56</span>
+                <input 
+                  type="text" 
+                  placeholder="912345678" 
+                  value={telefonoDir} 
+                  onChange={e => {
+                    const valor = e.target.value.replace(/\D/g, '').slice(0, 9);
+                    setTelefonoDir(valor);
+                    setDireccionSeleccionadaIdx(-1);
+                  }} 
+                  maxLength="9" 
+                  className="w-full bg-zinc-800 text-white px-3 py-2.5 text-xs outline-none" 
+                  required 
+                />
+              </div>
+
+              <input type="text" placeholder="Observación / Referencia (Opcional)" value={observacionNuevaDir} onChange={e => { setObservacionNuevaDir(e.target.value); setDireccionSeleccionadaIdx(-1); }} className="w-full bg-zinc-800 border border-zinc-700 text-white rounded p-2.5 text-xs outline-none" />
             </div>
 
             {usuarioActivo ? (
@@ -500,7 +642,7 @@ export default function Checkout({ carrito = [], total, usuarioActivo, setUsuari
 
             <button type="submit" disabled={procesando} className={`w-full py-4 rounded-xl font-bold text-white text-lg shadow-lg flex justify-center items-center gap-3 transition-all duration-300 cursor-pointer ${procesando ? 'bg-zinc-700 border-zinc-600 cursor-not-allowed' : 'bg-[#00b341] hover:bg-[#009b38] border border-[#009b38]'}`}>
               {procesando ? (
-                <><div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin"></div> Validando Pago...</>
+                <><div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin"></div> Guardando en Base de Datos...</>
               ) : (
                 <><CheckCircle size={22} /> Pagar {formatearCLP(totalAPagar)}</>
               )}

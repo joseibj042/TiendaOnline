@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { Routes, Route, useNavigate, useLocation, useParams, Navigate } from 'react-router-dom';
+
 import Navbar from './components/Navbar';
 import Home from './components/Home';
 import Catalog from './components/Catalog';
@@ -11,10 +13,55 @@ import UserProfile from './components/UserProfile';
 import OrderTracking from './components/OrderTracking';
 import Footer from './components/Footer';
 import ChatBot from './components/ChatBot';
-import { productosMock } from './data/mockData';
+import VistaAmigos from "./components/VistaAmigos";
+import { supabase } from './services/supabaseClient';
+
+// IMPORTANTE: Importamos el hook del contexto
+import { useSession } from './context/SessionContext'; 
+
+function UserProfileEnrutado({ setVistaActual }) {
+  const { tab } = useParams();
+  const { usuarioActivo, setUsuarioActivo } = useSession(); // Usamos el contexto aquí
+  return (
+    <UserProfile 
+      usuarioActivo={usuarioActivo} 
+      setUsuarioActivo={setUsuarioActivo} 
+      setVistaActual={setVistaActual} 
+      initialTab={tab || 'profile'} 
+    />
+  );
+}
 
 export default function App() {
-  const [vistaActual, setVistaActual] = useState(() => localStorage.getItem('redragon_vista') || 'home');
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // OBTENEMOS EL USUARIO DESDE EL CONTEXTO GLOBAL
+  const { usuarioActivo, setUsuarioActivo } = useSession();
+
+  const setVistaActual = (vista) => {
+    const diccionarioRutas = {
+      'home': '/',
+      'catalogo': '/catalogo',
+      'customizer': '/customizer',
+      'detalle': '/detalle',
+      'cart': '/cart',
+      'checkout': '/checkout',
+      'success': '/success',
+      'track-order': '/track-order',
+      'login': '/login',
+      'register': '/register',
+      'amigos': '/amigos',
+      'profile': '/perfil/profile',
+      'orders': '/perfil/orders',
+      'wishlist': '/perfil/wishlist',
+      'addresses': '/perfil/addresses',
+      'cards': '/perfil/cards',
+      'settings': '/perfil/settings'
+    };
+    navigate(diccionarioRutas[vista] || '/');
+  };
+
   const [carrito, setCarrito] = useState(() => {
     const carritoGuardado = localStorage.getItem('redragon_carrito');
     return carritoGuardado ? JSON.parse(carritoGuardado) : [];
@@ -25,19 +72,34 @@ export default function App() {
   });
   const [categoriaFiltro, setCategoriaFiltro] = useState(() => localStorage.getItem('redragon_categoria') || 'todos');
   
-  const [usuarioActivo, setUsuarioActivo] = useState(() => {
-    const sesion = localStorage.getItem('redragon_sesion_activa');
-    return sesion ? JSON.parse(sesion) : null;
-  });
-
   const [temaActual, setTemaActual] = useState(() => localStorage.getItem('redragon_tema') || 'red');
   const [toastMensaje, setToastMensaje] = useState(null);
 
-  useEffect(() => { 
-    localStorage.setItem('redragon_vista', vistaActual);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [vistaActual]);
+  const [productosAPI, setProductosAPI] = useState([]); 
+  const [cargandoProductos, setCargandoProductos] = useState(true);
 
+  // EFECTO 1: Cargar productos al inicio
+  useEffect(() => {
+    const cargarProductos = async () => {
+      setCargandoProductos(true);
+      const { data, error } = await supabase.from('products').select('*');
+      if (error) {
+        console.error("Error al cargar productos desde Supabase:", error);
+      } else if (data) {
+        setProductosAPI(data);
+      }
+      setCargandoProductos(false);
+    };
+
+    cargarProductos();
+  }, []);
+
+  // EFECTO 2: Scroll to top al cambiar de ruta
+  useEffect(() => { 
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [location.pathname]);
+
+  // EFECTOS 3: Sincronizar estados locales con localStorage
   useEffect(() => { localStorage.setItem('redragon_carrito', JSON.stringify(carrito)); }, [carrito]);
   useEffect(() => {
     if (productoSeleccionado) localStorage.setItem('redragon_producto', JSON.stringify(productoSeleccionado));
@@ -46,27 +108,45 @@ export default function App() {
   useEffect(() => { localStorage.setItem('redragon_categoria', categoriaFiltro); }, [categoriaFiltro]);
   useEffect(() => { localStorage.setItem('redragon_tema', temaActual); }, [temaActual]);
 
-  const agregarAlCarrito = (producto, cantidadSeleccionada = 1) => {
+  // IMPORTANTE: Hemos ELIMINADO el mega-useEffect que sincronizaba 'usuarioActivo' 
+  // con Supabase porque ahora eso vive dentro de SessionContext.jsx
+
+  const agregarAlCarrito = async (producto, cantidadSeleccionada = 1) => {
+    let nuevoCarrito;
     setCarrito(prevCarrito => {
       const indexExistente = prevCarrito.findIndex(item => item.id === producto.id);
       if (indexExistente !== -1) {
-        const nuevoCarrito = [...prevCarrito];
+        nuevoCarrito = [...prevCarrito];
         nuevoCarrito[indexExistente].cantidad = (nuevoCarrito[indexExistente].cantidad || 1) + cantidadSeleccionada;
-        return nuevoCarrito;
+      } else {
+        nuevoCarrito = [...prevCarrito, { ...producto, cantidad: cantidadSeleccionada }];
       }
-      return [...prevCarrito, { ...producto, cantidad: cantidadSeleccionada }];
+      return nuevoCarrito;
     });
+
+    if (usuarioActivo?.email) {
+      await supabase
+        .from('profiles')
+        .update({ cart: nuevoCarrito })
+        .eq('email', usuarioActivo.email);
+    }
+
     setToastMensaje("¡Producto añadido al carrito con éxito!");
     setTimeout(() => setToastMensaje(null), 3000);
   };
 
-  const vaciarCarrito = () => {
+  const vaciarCarrito = async () => {
     setCarrito([]);
+    if (usuarioActivo?.email) {
+      await supabase
+        .from('profiles')
+        .update({ cart: [] })
+        .eq('email', usuarioActivo.email);
+    }
   };
 
   const totalCarrito = carrito.reduce((acc, item) => acc + ((item.precio || 0) * (item.cantidad || 1)), 0);
 
-  // Mapeo de clases de acento global según el tema seleccionado
   const clasesTemaGlobal = {
     red: "theme-red",
     purple: "theme-purple",
@@ -87,117 +167,90 @@ export default function App() {
           setVistaActual={setVistaActual} 
           cantidadCarrito={carrito.reduce((acc, item) => acc + (item.cantidad || 1), 0)} 
           setCategoriaFiltro={setCategoriaFiltro}
+          // Puedes seguir pasando estas props temporalmente, aunque 
+          // lo ideal es que Navbar también llame a useSession() internamente
           usuarioActivo={usuarioActivo}
           setUsuarioActivo={setUsuarioActivo}
           temaActual={temaActual}
           setTemaActual={setTemaActual}
+          carrito={carrito}
+          setCarrito={setCarrito}
         />
 
         <div className="animate-fade-in">
-          {vistaActual === 'home' && (
-            <Home 
-              productos={productosMock} 
-              setVistaActual={setVistaActual} 
-              setProductoSeleccionado={setProductoSeleccionado} 
-            />
-          )}
-
-          {vistaActual === 'catalogo' && (
-            <Catalog 
-              productos={productosMock} 
-              categoriaFiltro={categoriaFiltro} 
-              setVistaActual={setVistaActual} 
-              setProductoSeleccionado={setProductoSeleccionado} 
-            />
-          )}
-
-          {vistaActual === 'customizer' && (
-            <Customizer 
-              agregarAlCarrito={agregarAlCarrito} 
-              setVistaActual={setVistaActual} 
-            />
-          )}
-
-          {vistaActual === 'detalle' && productoSeleccionado && (
-            <ProductDetail 
-              producto={productoSeleccionado} 
-              setVistaActual={setVistaActual} 
-              agregarAlCarrito={agregarAlCarrito} 
-              usuarioActivo={usuarioActivo}
-              setUsuarioActivo={setUsuarioActivo}
-            />
-          )}
-
-          {vistaActual === 'cart' && (
-            <Cart 
-              carrito={carrito} 
-              setCarrito={setCarrito} 
-              setVistaActual={setVistaActual} 
-            />
-          )}
-
-          {vistaActual === 'checkout' && (
-            <Checkout 
-              carrito={carrito} 
-              setCarrito={setCarrito} 
-              total={totalCarrito}
-              vaciarCarrito={vaciarCarrito}
-              setVistaActual={setVistaActual} 
-              usuarioActivo={usuarioActivo} 
-              setUsuarioActivo={setUsuarioActivo} 
-            />
-          )}
-
-          {vistaActual === 'success' && (
-            <div className="max-w-2xl mx-auto p-10 mt-16 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl text-center space-y-6 animate-scale-up relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-full h-2" style={{ backgroundColor: 'var(--color-primary)' }}></div>
-              <div className="w-24 h-24 rounded-full flex items-center justify-center mx-auto shadow-lg animate-bounce" style={{ backgroundColor: 'rgba(255,255,255,0.1)', color: 'var(--color-primary)', border: '1px solid var(--color-border)' }}>
-                <svg className="w-12 h-12" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg>
+          <Routes>
+            <Route path="/" element={
+              <Home productos={productosAPI} cargandoProductos={cargandoProductos} setVistaActual={setVistaActual} setProductoSeleccionado={setProductoSeleccionado} />
+            } />
+            
+            <Route path="/catalogo" element={
+              <Catalog productos={productosAPI} cargandoProductos={cargandoProductos} categoriaFiltro={categoriaFiltro} setVistaActual={setVistaActual} setProductoSeleccionado={setProductoSeleccionado} />
+            } />
+            
+            <Route path="/customizer" element={
+              <Customizer agregarAlCarrito={agregarAlCarrito} setVistaActual={setVistaActual} />
+            } />
+            
+            <Route path="/detalle" element={
+              productoSeleccionado ? (
+                <ProductDetail producto={productoSeleccionado} setVistaActual={setVistaActual} agregarAlCarrito={agregarAlCarrito} usuarioActivo={usuarioActivo} setUsuarioActivo={setUsuarioActivo} />
+              ) : (
+                <Navigate to="/catalogo" replace />
+              )
+            } />
+            
+            <Route path="/cart" element={
+              <Cart carrito={carrito} setCarrito={setCarrito} setVistaActual={setVistaActual} usuarioActivo={usuarioActivo} />
+            } />
+            
+            <Route path="/checkout" element={
+              <Checkout carrito={carrito} setCarrito={setCarrito} total={totalCarrito} vaciarCarrito={vaciarCarrito} setVistaActual={setVistaActual} usuarioActivo={usuarioActivo} setUsuarioActivo={setUsuarioActivo} />
+            } />
+            
+            <Route path="/success" element={
+              <div className="max-w-2xl mx-auto p-10 mt-16 bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl text-center space-y-6 animate-scale-up relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-2" style={{ backgroundColor: 'var(--color-primary)' }}></div>
+                <div className="w-24 h-24 rounded-full flex items-center justify-center mx-auto shadow-lg animate-bounce" style={{ backgroundColor: 'rgba(255,255,255,0.1)', color: 'var(--color-primary)', border: '1px solid var(--color-border)' }}>
+                  <svg className="w-12 h-12" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                </div>
+                <h2 className="text-3xl font-bold text-white">¡Pago Confirmado!</h2>
+                <p className="text-zinc-400 text-sm">Tu orden ha sido procesada con éxito y el carrito ha sido vaciado. Puedes revisar el estado de tu envío en la sección de pedidos.</p>
+                <div className="flex gap-4 pt-6 justify-center">
+                  <button onClick={() => setVistaActual('orders')} className="bg-zinc-800 hover:bg-zinc-700 text-white py-3 px-6 rounded-xl font-bold transition shadow-lg border border-zinc-700">Ver Mis Pedidos</button>
+                  <button onClick={() => setVistaActual('home')} className="text-white py-3 px-6 rounded-xl font-bold transition shadow-lg" style={{ backgroundColor: 'var(--color-primary)' }}>Seguir Comprando</button>
+                </div>
               </div>
-              <h2 className="text-3xl font-bold text-white">¡Pago Confirmado!</h2>
-              <p className="text-zinc-400 text-sm">Tu orden ha sido procesada con éxito y el carrito ha sido vaciado. Puedes revisar el estado de tu envío en la sección de pedidos.</p>
-              <div className="flex gap-4 pt-6 justify-center">
-                <button onClick={() => setVistaActual('orders')} className="bg-zinc-800 hover:bg-zinc-700 text-white py-3 px-6 rounded-xl font-bold transition shadow-lg border border-zinc-700">Ver Mis Pedidos</button>
-                <button onClick={() => setVistaActual('home')} className="text-white py-3 px-6 rounded-xl font-bold transition shadow-lg" style={{ backgroundColor: 'var(--color-primary)' }}>Seguir Comprando</button>
-              </div>
-            </div>
-          )}
-
-          {vistaActual === 'track-order' && (
-            <OrderTracking 
-              usuarioActivo={usuarioActivo} 
-              setVistaActual={setVistaActual} 
-            />
-          )}
-
-          {vistaActual === 'login' && (
-            <Auth 
-              modoInicial="login" 
-              setVistaActual={setVistaActual} 
-              setUsuarioActivo={setUsuarioActivo} 
-            />
-          )}
-
-          {vistaActual === 'register' && (
-            <Auth 
-              modoInicial="register" 
-              setVistaActual={setVistaActual} 
-              setUsuarioActivo={setUsuarioActivo} 
-            />
-          )}
-
-          {['profile', 'orders', 'wishlist', 'addresses', 'cards', 'settings'].includes(vistaActual) && usuarioActivo && (
-            <UserProfile 
-              usuarioActivo={usuarioActivo} 
-              setUsuarioActivo={setUsuarioActivo} 
-              setVistaActual={setVistaActual} 
-              initialTab={vistaActual} 
-            />
-          )}
+            } />
+            
+            <Route path="/track-order" element={
+              <OrderTracking usuarioActivo={usuarioActivo} setVistaActual={setVistaActual} />
+            } />
+            
+            <Route path="/login" element={
+              <Auth modoInicial="login" setVistaActual={setVistaActual} setUsuarioActivo={setUsuarioActivo} />
+            } />
+            
+            <Route path="/register" element={
+              <Auth modoInicial="register" setVistaActual={setVistaActual} setUsuarioActivo={setUsuarioActivo} />
+            } />
+            
+            <Route path="/amigos" element={
+              <VistaAmigos usuarioActivo={usuarioActivo} setUsuarioActivo={setUsuarioActivo} setVistaActual={setVistaActual} />
+            } />
+            
+            <Route path="/perfil/:tab" element={
+              usuarioActivo ? (
+                <UserProfileEnrutado setVistaActual={setVistaActual} />
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            } />
+            
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
         </div>
+        <ChatBot />
       </div>
-
-      <ChatBot />
       <Footer />
     </div>
   );
